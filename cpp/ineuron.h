@@ -29,30 +29,30 @@ typedef double (*iNeuronFn)(double x);
 //=====================================================================
 struct INEURON
 {
-	int input_count;			// count of input
-	int neuron_mode;			// INEURON_MODE_ACTIVATION or DISTANCE
-	double threshold;			// threshold input
-	double output;				// computing result
-	iNeuronFn function;			// f (x) = .... computing function
-	iNeuronFn derivative;		// f'(x) = .... derivative function
-	double weight[1];			// weights vector
+	int input_count;         // count of input
+	int neuron_mode;         // INEURON_MODE_ACTIVATION or DISTANCE
+	double threshold;        // threshold input
+	double output;           // computing result
+	iNeuronFn function;      // f (x) = .... computing function
+	iNeuronFn derivative;    // f'(x) = .... derivative function
+	double weight[1];        // weights vector
 };
 
 
 // f(x) = x
-#define INEURON_FUN_NORMAL		0
+#define INEURON_FUN_NORMAL      0
 
 // f(x) = (1 / (1 + exp(-2 * x)))
-#define INEURON_FUN_SIGMOD		1
+#define INEURON_FUN_SIGMOD      1
 
 // f(x) = ((2 / (1 + exp(-2 * x))) - 1)
-#define INEURON_FUN_BIPOLAR		2
+#define INEURON_FUN_BIPOLAR     2
 
 // f(x) = (x >= 0) ? 1 : 0
-#define INEURON_FUN_THRESHOLD	3
+#define INEURON_FUN_THRESHOLD   3
 
 // f(x) = tanh(x)
-#define INEURON_FUN_TANH		4
+#define INEURON_FUN_TANH        4
 
 
 #ifdef __cplusplus
@@ -116,8 +116,8 @@ void inlayer_compute_mode(struct INLAYER *layer, int mode);
 
 // inlayer_function - set neuron compute function
 void inlayer_function(struct INLAYER *layer, 
-						iNeuronFn function,
-						iNeuronFn derivative);
+                        iNeuronFn function,
+                        iNeuronFn derivative);
 
 
 #ifdef __cplusplus
@@ -163,8 +163,8 @@ void inn_compute_mode(struct INEURALNET *net, int mode);
 
 // inn_function - set function
 void inn_function(struct INEURALNET *net, 
-					iNeuronFn function,
-					iNeuronFn derivative);
+                    iNeuronFn function,
+                    iNeuronFn derivative);
 
 
 #ifdef __cplusplus
@@ -205,11 +205,11 @@ void intrain_bp_destroy(struct INTRAIN_BP *bp);
 
 // run learning
 double intrain_bp_run(struct INTRAIN_BP *bp, const double *input, 
-		const double *desired_output);
+        const double *desired_output);
 
 // run bp to learn all (input, output)
 int intrain_bp_epoch(struct INEURALNET *net, const double **inputv, const
-		double **outputv, double learnrate, int times, double limit);
+        double **outputv, double learnrate, int times, double limit);
 
 
 #ifdef __cplusplus

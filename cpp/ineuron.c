@@ -682,7 +682,7 @@ static void intrain_bp_update_network(struct INTRAIN_BP *bp)
 // intrain_bp_run - run learning
 //---------------------------------------------------------------------
 double intrain_bp_run(struct INTRAIN_BP *bp, const double *input, 
-		const double *desired_output)
+    const double *desired_output)
 {
 	double error;
 
@@ -700,7 +700,7 @@ double intrain_bp_run(struct INTRAIN_BP *bp, const double *input,
 // intrain_bp - run bp to learn all (input, output)
 //---------------------------------------------------------------------
 int intrain_bp_epoch(struct INEURALNET *net, const double **inputv, const
-		double **outputv, double learnrate, int times, double limit)
+    double **outputv, double learnrate, int times, double limit)
 {
 	struct INTRAIN_BP *bp;
 	double *inputs;
