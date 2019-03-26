@@ -12,7 +12,6 @@ from __future__ import print_function, unicode_literals
 import sys
 import random
 import numpy as np
-from numpy import *
 
 def loadDataSet(fileName):
     dataMat = []
@@ -226,7 +225,7 @@ def testRbf(k1 = 1.3):
 #----------------------------------------------------------------------
 def test1():
     dataArray, labelArray = loadDataSet("data/testSet.txt")
-    b, alphas = smoP(dataArray, labelArray, 0.3, 0.001, 20000)
+    b, alphas = smoP(dataArray, labelArray, 0.01, 0.001, 20000)
     print(b)
     print(alphas[alphas > 0])
     for i in range(100):
