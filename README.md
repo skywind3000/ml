@@ -1,2 +1,2 @@
 # ml
-Machine From Scratch
+Machine Learning From Scratch
