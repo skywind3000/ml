@@ -964,7 +964,15 @@ int ksvm_solver_resize(ksvm_solver_t *solver, int newsize)
 	int osize = solver->nrows;
 	int i;
 	if (newsize <= 0) {
-		if (solver->svx) ksvm_free(solver->svx);
+		if (solver->svx) {
+			for (i = 0; i < solver->svn; i++) {
+				if (solver->svx[i]) {
+					ksvm_vector_free(solver->svx[i]);
+					solver->svx[i] = NULL;
+				}
+			}
+			ksvm_free(solver->svx);
+		}
 		solver->svx = NULL;
 	}
 	else if (solver->svx == NULL) {
@@ -1270,14 +1278,11 @@ int ksvm_solver_smo(ksvm_solver_t *solver, int max_iter)
 	for (iter = 0; iter < max_iter; iter++) {
 		if (entire == 0 && changed == 0) break;
 		changed = 0;
-		entire = 1;
+		// entire = 1;
 		if (entire) {
 			for (i = 0; i < nrows; i++) {
-				// solver->G[i] = ksvm_solver_calculate_gx(solver, i, solver->nrows);
-			}
-			for (i = 0; i < nrows; i++) {
 				int j = ksvm_solver_getj(solver, i);
-				j = rand() % nrows;
+				// j = rand() % nrows;
 				changed += ksvm_solver_step(solver, i, j);
 			}
 			// printf("entire: %d\n", changed);
@@ -1290,7 +1295,7 @@ int ksvm_solver_smo(ksvm_solver_t *solver, int max_iter)
 					changed += ksvm_solver_step(solver, i, j);
 				}
 			}
-			printf("partial: %d\n", changed);
+			// printf("partial: %d\n", changed);
 		}
 		if (entire) {
 			entire = 0;
@@ -1330,5 +1335,134 @@ int ksvm_solver_predict(const ksvm_solver_t *solver, const ksvm_vector_t *x)
 	}
 	return (sum > 0)? 1 : (-1);
 }
+
+
+//---------------------------------------------------------------------
+// ksvm
+//---------------------------------------------------------------------
+ksvm_model_t* ksvm_model_new(const ksvm_parameter_t *param)
+{
+	ksvm_model_t *model = ksvm_new(ksvm_model_t, 1);
+	model->param = param[0];
+	model->nclasses = 0;
+	model->size = 0;
+	model->labels = NULL;
+	model->svp = NULL;
+	model->svn = NULL;
+	model->svc = NULL;
+	model->svx = NULL;
+	return model;
+}
+
+
+//---------------------------------------------------------------------
+// free model
+//---------------------------------------------------------------------
+void ksvm_model_free(ksvm_model_t *model)
+{
+	int i;
+	assert(model);
+	if (model->svx) {
+		for (i = 0; i < model->size; i++) {
+			if (model->svx[i]) {
+				ksvm_vector_free(model->svx[i]);
+			}
+			model->svx[i] = NULL;
+		}	
+		ksvm_free(model->svx);
+		model->svx = NULL;
+	}
+	if (model->svc) {
+		ksvm_free(model->svc);
+		model->svc = NULL;
+	}
+	if (model->svp) {
+		ksvm_free(model->svp);
+		model->svp = NULL;
+	}
+	if (model->svn) {
+		ksvm_free(model->svn);
+		model->svn = NULL;
+	}
+	if (model->labels) {
+		ksvm_free(model->labels);
+		model->labels = NULL;
+	}
+	model->size = 0;
+	model->nclasses = 0;
+	ksvm_free(model);
+}
+
+
+
+//---------------------------------------------------------------------
+// model resize
+//---------------------------------------------------------------------
+int ksvm_model_resize(ksvm_model_t *model, int newsize)
+{
+	int i;
+	if (newsize <= 0) {
+		if (model->svx) {
+			for (i = 0; i < model->size; i++) {
+				if (model->svx[i]) {
+					ksvm_vector_free(model->svx[i]);
+					model->svx[i] = NULL;
+				}
+			}
+			ksvm_free(model->svx);
+			model->svx = NULL;
+		}	
+	}
+	else if (model->svx == NULL) {
+		model->svx = ksvm_new(ksvm_vector_t*, newsize);
+		assert(model->svx);
+		for (i = 0; i < newsize; i++) {
+			model->svx[i] = NULL;
+		}
+	}
+	else {
+		ksvm_vector_t **saved = model->svx;
+		model->svx = ksvm_new(ksvm_vector_t*, newsize);
+		assert(model->svx);
+		for (i = 0; i < newsize; i++) {
+			model->svx[i] = (i < model->size)? saved[i] : NULL;
+		}
+		for (; i < model->size; i++) {
+			if (saved[i]) {
+				ksvm_vector_free(saved[i]);
+				saved[i] = NULL;
+			}
+		}
+		ksvm_free(saved);
+	}
+	model->svc = (double*)ksvm_realloc(model->svc, sizeof(double), model->size, newsize);
+	model->size = newsize;
+	return 0;
+}
+
+
+//---------------------------------------------------------------------
+// init class number
+//---------------------------------------------------------------------
+int ksvm_model_init_class(ksvm_model_t *model, int nclasses)
+{
+	int old_pairs = model->nclasses * (model->nclasses - 1) / 2;
+	int new_pairs = nclasses * (nclasses - 1) / 2;
+	model->labels = (int*)ksvm_realloc(model->labels, sizeof(int), model->nclasses, nclasses);
+	model->svp = (int*)ksvm_realloc(model->svp, sizeof(int), old_pairs, new_pairs);
+	model->svn = (int*)ksvm_realloc(model->svn, sizeof(int), old_pairs, new_pairs);
+	model->nclasses = nclasses;
+	return 0;
+}
+
+
+//---------------------------------------------------------------------
+// train
+//---------------------------------------------------------------------
+int ksvm_model_train(ksvm_model_t *model, const ksvm_problem_t *pb)
+{
+	
+}
+
 
 

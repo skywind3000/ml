@@ -104,6 +104,17 @@ typedef struct {
 	ksvm_kernel_t *kernel;    // kernel
 }	ksvm_solver_t;
 
+// model
+typedef struct {
+	ksvm_parameter_t param;    // parameter
+	int nclasses;              // class names
+	int size;                  // total support vector number
+	int *labels;               // labels for each class
+	int *svp;                  // support vector start position
+	int *svn;                  // support vector sizes
+	double *svc;               // support vector coefficients
+	ksvm_vector_t **svx;       // support vectors
+}	ksvm_model_t;
 
 
 #ifdef __cplusplus
@@ -187,6 +198,9 @@ ksvm_solver_t* ksvm_solver_new(const ksvm_parameter_t *param, ksvm_kernel_t *ker
 // free solver
 void ksvm_solver_free(ksvm_solver_t *solver);
 
+// resize internal buffer
+int ksvm_solver_resize(ksvm_solver_t *solver, int newsize);
+
 // init SVC from two labels
 int ksvm_solver_init_svc(ksvm_solver_t *solver, const ksvm_parameter_t *param, int lable_p, int label_n);
 
@@ -195,6 +209,23 @@ double ksvm_solver_kernel(ksvm_solver_t *solver, int xi, int xj);
 
 // calculate G(xi) = sum([ aj * yj * K(xj, xi) for j in range(active_size) ])
 double ksvm_solver_calculate_gx(ksvm_solver_t *solver, int i, int active_size);
+
+
+//---------------------------------------------------------------------
+// model
+//---------------------------------------------------------------------
+
+// create new model
+ksvm_model_t* ksvm_model_new(const ksvm_parameter_t *param);
+
+// free model
+void ksvm_model_free(ksvm_model_t *model);
+
+// resize internal buffer
+int ksvm_model_resize(ksvm_model_t *model, int newsize);
+
+// train data
+int ksvm_model_train(ksvm_model_t *model, const ksvm_problem_t *pb);
 
 
 #ifdef __cplusplus
