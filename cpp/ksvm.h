@@ -228,6 +228,9 @@ int ksvm_model_resize(ksvm_model_t *model, int newsize);
 // train data
 int ksvm_model_train(ksvm_model_t *model, const ksvm_problem_t *pb);
 
+// predict an "x" and output label
+double ksvm_model_predict(const ksvm_model_t *model, const ksvm_vector_t *x, double *dec_values);
+
 
 #ifdef __cplusplus
 }
