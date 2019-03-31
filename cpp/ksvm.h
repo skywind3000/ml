@@ -112,6 +112,7 @@ typedef struct {
 	int *labels;               // labels for each class
 	int *svp;                  // support vector start position
 	int *svn;                  // support vector sizes
+	double *rho;               // "b" array
 	double *svc;               // support vector coefficients
 	ksvm_vector_t **svx;       // support vectors
 }	ksvm_model_t;
