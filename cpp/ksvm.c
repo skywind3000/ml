@@ -1296,123 +1296,9 @@ int ksvm_solver_kkt_check(const ksvm_solver_t *solver, int i, double *error)
 int ksvm_solver_alpha_status(const ksvm_solver_t *solver, int i)
 {
 	double a = solver->alpha[i];
-	if (a < 0) return KSVM_ALPHA_LOWER_BOUND;
+	if (a <= 0) return KSVM_ALPHA_LOWER_BOUND;
 	else if (a >= ksvm_solver_ci(solver, i)) return KSVM_ALPHA_UPPER_BOUND;
 	return KSVM_ALPHA_FREE;
-}
-
-
-//---------------------------------------------------------------------
-// select2
-//---------------------------------------------------------------------
-int ksvm_solver_select2(ksvm_solver_t *solver, int *out_i, int *out_j)
-{
-	double Gmax = -HUGE_VAL;
-	int Gmax_idx = -1;
-	int i, j;
-	for (i = 0; i < solver->active_size; i++) {
-		if (solver->y[i] > 0) {
-			if (ksvm_solver_alpha_status(solver, i) != KSVM_ALPHA_UPPER_BOUND) {
-				if (-solver->G[i] > Gmax) {
-					Gmax_idx = i;
-					Gmax = -solver->G[i];
-				}
-			}
-		}	
-		else if (solver->y[i] < 0) {
-			if (ksvm_solver_alpha_status(solver, i) != KSVM_ALPHA_LOWER_BOUND) {
-				if (-solver->G[i] > Gmax) {
-					Gmax_idx = i;
-					Gmax = -solver->G[i];
-				}
-			}
-		}
-	}
-	i = Gmax_idx;
-	if (Gmax_idx < 0) {
-		return 0;
-	}
-	else {
-		double Gi = solver->G[i];
-		double Ei = (Gi + solver->b) - solver->y[i];
-		double maxdelta = 0.0;
-		int nrows = solver->active_size;
-		int selected = -1;
-		for (j = 0; j < nrows; j++) {
-			double Gj, Ej, delta;
-			if (i == j) continue;
-			// if (solver->alpha[j] == 0.0) continue;
-			Gj = solver->G[j];
-			Ej = (Gj + solver->b) - solver->y[j];
-			delta = ksvm_f_abs(Ei - Ej);
-			if (delta > maxdelta) {
-				maxdelta = delta;
-				selected = j;
-			}
-		}
-		if (selected < 0) {
-			printf("suck2\n");
-			return 0;
-		}
-		if (out_i) out_i[0] = i;
-		if (out_j) out_j[0] = selected;
-	}
-	return 1;
-}
-
-
-//---------------------------------------------------------------------
-// select
-//---------------------------------------------------------------------
-int ksvm_solver_select(ksvm_solver_t *solver, int *out_i, int *out_j)
-{
-	int i = -1, j, k;
-	double error = -1;
-	for (k = 0; k < solver->active_size; k++) {
-		double e;
-		if (ksvm_solver_kkt_check(solver, k, &e)) {
-			if (e > error) {
-				i = k;
-				error = e;
-			}
-		}
-	}
-	if (i < 0) {
-		printf("suck1\n");
-		return 0;
-	}
-	else {
-		double Gi = solver->G[i];
-		double Ei = (Gi + solver->b) - solver->y[i];
-		double Kii = ksvm_solver_kernel(solver, i, i);
-		double maxdelta = 0.0;
-		int nrows = solver->active_size;
-		int selected = -1;
-		for (j = 0; j < nrows; j++) {
-			double Gj, Ej, Kij, Kjj, eta, delta;
-			if (i == j) continue;
-			// if (solver->alpha[j] == 0.0) continue;
-			Gj = solver->G[j];
-			Ej = (Gj + solver->b) - solver->y[j];
-			Kjj = ksvm_solver_kernel(solver, j, j);
-			Kij = ksvm_solver_kernel(solver, i, j);
-			eta = Kii + Kjj - 2 * Kij;
-			if (eta <= 0) eta = KSVM_TAU;
-			delta = solver->y[j] * (Ei - Ej) / eta;
-			delta = ksvm_f_abs(delta);
-			if (delta > maxdelta) {
-				maxdelta = delta;
-				selected = j;
-			}
-		}
-		if (selected < 0) {
-			printf("suck2\n");
-			return 0;
-		}
-		if (out_i) out_i[0] = i;
-		if (out_j) out_j[0] = selected;
-	}
-	return 1;
 }
 
 
@@ -1466,7 +1352,6 @@ int ksvm_solver_smo(ksvm_solver_t *solver, int max_iter)
 	int i, j, k = 0;
 	max_iter = ksvm_max(max_iter, 100000);
 	for (iter = 0; iter < max_iter; iter++) {
-#if 1
 		if (entire == 0 && changed == 0) break;
 		changed = 0;
 		// entire = 1;
@@ -1496,16 +1381,6 @@ int ksvm_solver_smo(ksvm_solver_t *solver, int max_iter)
 		else if (changed == 0) {
 			entire = 1;
 		}
-#else
-		if (ksvm_solver_select2(solver, &i, &j) == 0) {
-			printf("exit\n");
-			break;
-		}
-		// printf("selected: %d, %d\n", i, j);
-		ksvm_solver_step(solver, i, j);
-		entire++;
-		changed++;
-#endif
 	}
 	for (i = 0; i < nrows; i++) {
 		if (solver->alpha[i] != 0) {
