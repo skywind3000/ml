@@ -85,6 +85,7 @@ typedef struct {
 
 // solver
 typedef struct {
+	int svm_type;             // KSVM_TYPE_SVC / KSVM_TYPE_SVR
 	int *index;               // vector index
 	double *y;                // labels
 	double *alpha;            // alphas
@@ -94,6 +95,7 @@ typedef struct {
 	int label_p;              // label positive
 	int svn;                  // support vector size
 	ksvm_vector_t **svx;      // support vectors
+	double *sign;             // sign for regression
 	double *svy;              // support vector labels
 	double *sva;              // support vector alphas
 	double *G;                // G(x) = sum([ai * yi * K(xi, x) for i in N])
