@@ -1070,6 +1070,7 @@ int ksvm_solver_init_svc(ksvm_solver_t *solver, const ksvm_parameter_t *param, i
 		return -1;
 	ksvm_solver_resize(solver, nrows);
 	solver->active_size = solver->nrows;
+	solver->svm_type = KSVM_TYPE_SVC;
 	solver->label_p = label_p;
 	solver->label_n = label_n;
 	solver->b = 0;
@@ -1111,6 +1112,35 @@ int ksvm_solver_init_svc(ksvm_solver_t *solver, const ksvm_parameter_t *param, i
 
 
 //---------------------------------------------------------------------
+// init SVR
+//---------------------------------------------------------------------
+int ksvm_solver_init_svr(ksvm_solver_t *solver, const ksvm_parameter_t *param)
+{
+	const ksvm_problem_t *pb = solver->kernel->pb;
+	int nrows = pb->nrows;
+	int i;
+	ksvm_solver_resize(solver, nrows * 2);
+	for (i = 0; i < nrows; i++) {
+		solver->alpha[i] = 0;
+		solver->G[i] = pb->y[i] - param->p + 1;
+		solver->y[i] = 1;
+		solver->index[i] = i;
+
+		solver->alpha[i + nrows] = 0;
+		solver->G[i + nrows] = pb->y[i] + param->p - 1;
+		solver->y[i + nrows] = -1;
+		solver->index[i + nrows] = i;
+	}
+	solver->active_size = solver->nrows;
+	solver->svm_type = KSVM_TYPE_SVR;
+	solver->b = 0;
+	solver->Cp = param->C;
+	solver->Cn = param->C;
+	return 0;
+}
+
+
+//---------------------------------------------------------------------
 // get kernel result
 //---------------------------------------------------------------------
 double ksvm_solver_kernel(ksvm_solver_t *solver, int xi, int xj)
@@ -1138,7 +1168,6 @@ double ksvm_solver_calculate_gx(ksvm_solver_t *solver, int i, int active_size)
 		k = ksvm_solver_kernel(solver, j, i);
 		sum += a * y[j] * k;
 	}
-	solver->G[i] = sum;
 	return sum;
 }
 
@@ -1350,7 +1379,6 @@ int ksvm_solver_smo(ksvm_solver_t *solver, int max_iter)
 	int entire = 1;
 	int changed = 0;
 	int i, j, k = 0;
-	max_iter = ksvm_max(max_iter, 100000);
 	for (iter = 0; iter < max_iter; iter++) {
 		if (entire == 0 && changed == 0) break;
 		changed = 0;
@@ -1382,14 +1410,29 @@ int ksvm_solver_smo(ksvm_solver_t *solver, int max_iter)
 			entire = 1;
 		}
 	}
-	for (i = 0; i < nrows; i++) {
-		if (solver->alpha[i] != 0) {
-			int index = solver->index[i];
-			solver->svx[k] = ksvm_vector_clone(solver->kernel->x[index]);
-			solver->svy[k] = solver->y[i];
-			solver->sva[k] = solver->alpha[i];
-			k++;
+	if (solver->svm_type == KSVM_TYPE_SVC) {
+		for (i = 0; i < nrows; i++) {
+			if (solver->alpha[i] != 0) {
+				int index = solver->index[i];
+				solver->svx[k] = ksvm_vector_clone(solver->kernel->x[index]);
+				solver->svy[k] = solver->y[i];
+				solver->sva[k] = solver->alpha[i];
+				k++;
+			}
 		}
+	}
+	else if (solver->svm_type == KSVM_TYPE_SVR) {
+		int nrows = solver->nrows / 2;
+		for (i = 0; i < nrows; i++) {
+			if (solver->alpha[i] != 0 || solver->alpha[i + nrows] != 0) {
+				int index = solver->index[i];
+				solver->svx[k] = ksvm_vector_clone(solver->kernel->x[index]);
+				solver->svy[k] = solver->y[i];
+				solver->sva[k] = solver->alpha[i + nrows] - solver->alpha[i];
+				k++;	
+			}
+		}
+		solver->b = -solver->b;
 	}
 	solver->svn = k;
 #if 0
@@ -1406,7 +1449,11 @@ int ksvm_solver_smo(ksvm_solver_t *solver, int max_iter)
 //---------------------------------------------------------------------
 void ksvm_solver_train(ksvm_solver_t *solver)
 {
-	ksvm_solver_smo(solver, 100000);
+	int max_iter = 0;
+	if (solver->nrows > INT_MAX / 100) max_iter = INT_MAX;
+	else max_iter = solver->nrows * 100;
+	max_iter = ksvm_max(max_iter, 10000);
+	ksvm_solver_smo(solver, max_iter);
 }
 
 
@@ -1422,6 +1469,8 @@ int ksvm_solver_predict(const ksvm_solver_t *solver, const ksvm_vector_t *x)
 		double k = ksvm_kernel_call(kernel, x, solver->svx[i]);
 		sum += solver->sva[i] * solver->svy[i] * k;
 	}
+	if (solver->svm_type == KSVM_TYPE_SVR)
+		return sum;
 	return (sum > 0)? 1 : (-1);
 }
 
@@ -1556,40 +1605,64 @@ int ksvm_model_init_class(ksvm_model_t *model, int nclasses)
 //---------------------------------------------------------------------
 int ksvm_model_train(ksvm_model_t *model, const ksvm_problem_t *pb)
 {
-	int labels[KSVM_MAX_CLASS];
-	int counts[KSVM_MAX_CLASS];
-	int nclasses, i, j, k;
-	int x = 0, p = 0;
 	ksvm_kernel_t *kernel;
-	nclasses = ksvm_problem_group(pb, labels, counts);
-	if (nclasses <= 1) return -1;
-	ksvm_model_init_class(model, nclasses);
-	assert(model->labels);
 	kernel = ksvm_kernel_new(&model->param, pb);
-	assert(kernel);
-	for (i = 0; i < nclasses; i++) {
-		model->labels[i] = labels[i];
-	}
-	ksvm_model_resize(model, 0);
-	for (i = 0; i < nclasses; i++) {
-		for (j = i + 1; j < nclasses; j++, p++) {
-			int label_i = model->labels[i];
-			int label_j = model->labels[j];
-			ksvm_solver_t *solver = ksvm_solver_new(&model->param, kernel);
-			ksvm_solver_init_svc(solver, &model->param, label_i, label_j);
-			ksvm_solver_train(solver);
-			model->svp[p] = x;
-			model->svn[p] = solver->svn;
-			ksvm_model_resize(model, model->size + solver->svn);
-			for (k = 0; k < solver->svn; x++, k++) {
-				double alpha = solver->sva[k];
-				double y = solver->svy[k];
-				model->svx[x] = ksvm_vector_clone(solver->svx[k]);
-				model->svc[x] = alpha * y;
-			}
-			model->rho[p] = solver->b;
-			ksvm_solver_free(solver);
+	if (model->param.svm_type == KSVM_TYPE_SVC) {
+		int labels[KSVM_MAX_CLASS];
+		int counts[KSVM_MAX_CLASS];
+		int nclasses, i, j, k;
+		int x = 0, p = 0;
+		nclasses = ksvm_problem_group(pb, labels, counts);
+		if (nclasses <= 1) return -1;
+		ksvm_model_init_class(model, nclasses);
+		assert(model->labels);
+		assert(kernel);
+		for (i = 0; i < nclasses; i++) {
+			model->labels[i] = labels[i];
 		}
+		ksvm_model_resize(model, 0);
+		for (i = 0; i < nclasses; i++) {
+			for (j = i + 1; j < nclasses; j++, p++) {
+				int label_i = model->labels[i];
+				int label_j = model->labels[j];
+				ksvm_solver_t *solver = ksvm_solver_new(&model->param, kernel);
+				ksvm_solver_init_svc(solver, &model->param, label_i, label_j);
+				ksvm_solver_train(solver);
+				model->svp[p] = x;
+				model->svn[p] = solver->svn;
+				ksvm_model_resize(model, model->size + solver->svn);
+				for (k = 0; k < solver->svn; x++, k++) {
+					double alpha = solver->sva[k];
+					double y = solver->svy[k];
+					model->svx[x] = ksvm_vector_clone(solver->svx[k]);
+					model->svc[x] = alpha * y;
+				}
+				model->rho[p] = solver->b;
+				ksvm_solver_free(solver);
+			}
+		}
+	}
+	else if (model->param.svm_type == KSVM_TYPE_SVR) {
+		ksvm_solver_t *solver = ksvm_solver_new(&model->param, kernel);
+		int k;
+		assert(solver);
+		ksvm_model_init_class(model, 2);
+		ksvm_solver_init_svr(solver, &model->param);
+		ksvm_solver_train(solver);
+		model->svn[0] = solver->svn;
+		model->svp[0] = 0;
+		ksvm_model_resize(model, solver->svn);
+		for (k = 0; k < solver->svn; k++) {
+			double alpha = solver->sva[k];
+			double y = solver->svy[k];
+			model->svx[k] = ksvm_vector_clone(solver->svx[k]);
+			model->svc[k] = alpha * y;
+		}
+		model->rho[0] = solver->b;
+		ksvm_solver_free(solver);
+	}
+	else {
+		return -1;
 	}
 	ksvm_kernel_free(kernel);
 	return 0;
@@ -1609,30 +1682,46 @@ double ksvm_model_predict(const ksvm_model_t *model, const ksvm_vector_t *x, dou
 		return 0;
 	}
 	ksvm_kernel_init(&kernel, &model->param);
-	for (i = 0; i < KSVM_MAX_CLASS; i++)
-		votes[i] = 0;
-	for (i = 0; i < model->nclasses; i++) {
-		for (j = i + 1; j < model->nclasses; j++, p++) {
-			double sum = model->rho[p];	
-			int svn = model->svn[p];
-			int start = model->svp[p];
-			for (k = 0; k < svn; k++, start++) {
-				const ksvm_vector_t *svx = model->svx[start];
-				double kk = ksvm_kernel_call(&kernel, x, svx);
-				sum += model->svc[start] * kk;
+	if (model->param.svm_type == KSVM_TYPE_SVC) {
+		for (i = 0; i < KSVM_MAX_CLASS; i++)
+			votes[i] = 0;
+		for (i = 0; i < model->nclasses; i++) {
+			for (j = i + 1; j < model->nclasses; j++, p++) {
+				double sum = model->rho[p];	
+				int svn = model->svn[p];
+				int start = model->svp[p];
+				for (k = 0; k < svn; k++, start++) {
+					const ksvm_vector_t *svx = model->svx[start];
+					double kk = ksvm_kernel_call(&kernel, x, svx);
+					sum += model->svc[start] * kk;
+				}
+				if (dec_values) {
+					dec_values[p] = sum;
+				}
+				if (sum > 0) votes[i]++;
+				else votes[j]++;
 			}
-			if (dec_values) {
-				dec_values[p] = sum;
-			}
-			if (sum > 0) votes[i]++;
-			else votes[j]++;
 		}
+		for (i = 0, k = 0; i < model->nclasses; i++) {
+			if (votes[i] > votes[k])
+				k = i;
+		}
+		return model->labels[k];
 	}
-	for (i = 0, k = 0; i < model->nclasses; i++) {
-		if (votes[i] > votes[k])
-			k = i;
+	else if (model->param.svm_type == KSVM_TYPE_SVR) {
+		double sum = model->rho[0];
+		int svn = model->svn[0];
+		for (k = 0; k < svn; k++) {
+			const ksvm_vector_t *svx = model->svx[k];
+			double kk = ksvm_kernel_call(&kernel, x, svx);
+			sum += model->svc[k] * kk;
+		}
+		if (dec_values) {
+			dec_values[0] = sum;
+		}
+		return sum;
 	}
-	return model->labels[k];
+	return 0.0;
 }
 
 

@@ -51,7 +51,8 @@ typedef struct {
 	double coef0;         // for poly/sigmoid
 	double C;             // constraint
 	double cache_size;    // in MB
-	double eps;
+	double eps;           // tolerance
+	int p;                // for regression
 	int nweights;
 	double *weight;
 	int *weight_label;
