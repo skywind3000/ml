@@ -188,7 +188,7 @@ def smoP(dataMatIn, classLabels, C, toler, maxIter, kTup = ('lin', 0)):
 # test rbf
 #----------------------------------------------------------------------
 def testRbf(k1 = 1.3):
-    dataArr, labelArr = loadDataSet('data/testSetRBF.txt')
+    dataArr, labelArr = loadDataSet('../data/testSetRBF.txt')
     b, alphas = smoP(dataArr, labelArr, 200, 0.0001, 10000, ('rbf', k1))
     datMat = np.mat(dataArr)
     labelMat = np.mat(labelArr).transpose()
@@ -204,7 +204,7 @@ def testRbf(k1 = 1.3):
         if np.sign(predict) != np.sign(labelArr[i]):
             errorCount += 1
     print("the training error rate is: %f" % (float(errorCount) / m))
-    dataArr, labelArr = loadDataSet('data/testSetRBF2.txt')
+    dataArr, labelArr = loadDataSet('../data/testSetRBF2.txt')
     errorCount = 0
     datMat = np.mat(dataArr)
     labelMat = np.mat(labelArr).transpose()
@@ -224,7 +224,7 @@ def testRbf(k1 = 1.3):
 # 
 #----------------------------------------------------------------------
 def test1():
-    dataArray, labelArray = loadDataSet("data/testSet.txt")
+    dataArray, labelArray = loadDataSet("../data/testSet.txt")
     b, alphas = smoP(dataArray, labelArray, 0.01, 0.001, 20000)
     print(b)
     print(alphas[alphas > 0])

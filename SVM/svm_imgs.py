@@ -43,7 +43,7 @@ def loadImages(dirName):
     return trainingMat, hwLabels
 
 def testDigits(kTup = ('rbf', 10)):
-    dataArr, labelArr = loadImages('data/svm-digits/trainingDigits')
+    dataArr, labelArr = loadImages('../data/svm-digits/trainingDigits')
     print('fuck')
     b, alphas = svm_smop.smoP(dataArr, labelArr, 200, 0.0001, 10000, kTup)
     print('suck')
@@ -61,7 +61,7 @@ def testDigits(kTup = ('rbf', 10)):
         if np.sign(predict) != np.sign(labelArr[i]): 
             errorCount += 1
     print("the training error rate is: %f" % (float(errorCount) / m))
-    dataArr, labelArr = loadImages("data/svm-digits/testDigits")
+    dataArr, labelArr = loadImages("../data/svm-digits/testDigits")
     errorCount = 0
     datMat = np.mat(dataArr)
     labelMat = np.mat(labelArr).transpose()

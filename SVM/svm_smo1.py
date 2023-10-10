@@ -110,7 +110,7 @@ def smoSimple(dataMatIn, classLabels, C, toler, maxIter):
 # 
 #----------------------------------------------------------------------
 def test1():
-    dataArray, labelArray = loadDataSet("data/testSet.txt")
+    dataArray, labelArray = loadDataSet("../data/testSet.txt")
     b, alphas = smoSimple(dataArray, labelArray, 0.6, 0.001, 40)
     print(b)
     print(alphas[alphas > 0])
